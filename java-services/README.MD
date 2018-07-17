@@ -45,6 +45,8 @@ Description=My Service Management
 
 [Service]
 Type=simple
+Restart=always
+RestartSec=1
 ExecStart=/usr/bin/python /opt/baz/cleanup.py
 StandardError=journal
 
@@ -59,108 +61,110 @@ for java
 
 #!/bin/bash
 
-USAGE="Usage: bash my-script.sh {start|stop|restart|status}"
-HOME_DIR=/opt/my-service/
+#set -x
+
+USAGE="Usage: bash deploy.sh {start|stop|restart|status}"
+HOME_DIR=~/tmp2/
+SERVICE_NAME="xxxx-api"
+EXEC_PROGRAM="xxxx-api.jar"
+PARAMS_COUNT=1
+
+
+# 操作: start, stop, restart, status
+SERVICE_OPERATE=${1}
+DATE=`date '+%Y-%m-%d %H:%M:%S'`
+# 找出对应进程PID
+PID_CMD="ps -ef | grep ${EXEC_PROGRAM} | grep -v grep | awk '{print \$2}'"
+
 
 # 进入相应目录
 cd $HOME_DIR
 
-# 读参数
-serviceName="my-service"
-serviceProcessName="my-service.jar"
-# 操作: start, stop, restart, status
-serviceOperate=${1}
-# 获取当前执行的脚本命令，用于监控时启动命令
-curExecCmd="sh $0 $@"
 
-# 找出对应进程
-PID_CMD="ps -ef | grep ${serviceProcessName} | grep -v grep | awk '{print \$2}'"
-
-
-checkService() {
+status() {
     # 检查看进程是否启动
-    echo `date -d "now" +"%Y-%m-%d %H:%M:%S"`" try to check ${serviceName} server status"
+    echo $DATE " try to check ${SERVICE_NAME} server status"
     pid=`eval ${PID_CMD}`
     if [ -z "${pid}" ]; then
-        echo "${serviceName} server is not running"
+        echo $DATE "${SERVICE_NAME} server is not running"
     else
-        echo "${serviceName} server is running, pid: ${pid}"
+        echo $DATE "${SERVICE_NAME} server is running, pid: ${pid}"
     fi
-    
+
     return ${pid}
 }
 
-startService() {
+start() {
     # 检查进程是否存在，如果存在则直接退出
-    echo `date -d "now" +"%Y-%m-%d %H:%M:%S"`" try to start ${serviceName} server"
+    echo $DATE "try to start ${SERVICE_NAME} server"
     pid=`eval ${PID_CMD}`
     if [[ ! -z "${pid}" ]]; then
-        echo "${serviceName} server is running, pid ${pid}, exit..."
+        echo $DATE "${SERVICE_NAME} server is running, pid ${pid}, exit..."
         return 1
     fi
 
     # 启动程序
-    cmd="nohup java -jar ${serviceJarName} > /dev/null 2>&1 &"
-    echo `date -d "now" +"%Y-%m-%d %H:%M:%S"`" try to start ${serviceName}server , cmd: ${cmd}"
+    cmd="nohup java -jar ${EXEC_PROGRAM} > /dev/null 2>&1 &"
+    echo $DATE "try to start ${SERVICE_NAME}server with cmd: ${cmd}"
     eval ${cmd}
     eval=$?
     sleep 5
     # 判断返回值
     if [[ ${eval} -eq 0 ]]; then
-        echo `date -d "now" +"%Y-%m-%d %H:%M:%S"`" success to start ${serviceName}server "
-        checkService
+        echo $DATE  "success to start ${SERVICE_NAME}server "
+        status
     else
-        echo `date -d "now" +"%Y-%m-%d %H:%M:%S"`" fail to start ${serviceName} server"
+        echo $DATE "fail to start ${SERVICE_NAME} server"
     fi
 }
 
-stopService() {
+stop() {
     # 检查进程是否存在，如果不存在则直接退出
-    echo `date -d "now" +"%Y-%m-%d %H:%M:%S"`" try to stop ${serviceName} server"
+    echo $DATE "try to stop ${SERVICE_NAME} server"
     pid=`eval ${PID_CMD}`
     if [[ -z "${pid}" ]]; then
-        echo "${serviceName} server is not running, exit..."
+        echo $DATE "${SERVICE_NAME} server is not running, exit..."
         return 1
     fi
-    
+
     # 结束程序
     cmd="kill -9 ${pid}"
-    echo `date -d "now" +"%Y-%m-%d %H:%M:%S"`" try to stop ${serviceName} server, cmd: ${cmd}"
+    echo $DATE "try to stop ${SERVICE_NAME} server with cmd: ${cmd}"
     eval ${cmd}
     eval=$?
     sleep 2
     # 判断返回值
     if [[ ${eval} -eq 0 ]]; then
-        echo `date -d "now" +"%Y-%m-%d %H:%M:%S"`" success to stop ${serviceName} server"
+        echo $DATE "success to stop ${SERVICE_NAME} server"
         # 再次检查，看进程是否启动
-        checkService
+        status
     else
-        echo `date -d "now" +"%Y-%m-%d %H:%M:%S"`" fail to stop ${serviceName} server"
+        echo $DATE "fail to stop ${SERVICE_NAME} server"
     fi
 }
 
 
-case "${serviceOperate}" in
+case "${SERVICE_OPERATE}" in
   start)
-    if [[ $# != 3 ]] ; then  # 判断参数个数
+    if [[ $# != ${PARAMS_COUNT} ]] ; then  # 判断参数个数
         echo "USAGE: $0 ${USAGE}"
         exit 1;
     fi
-    startService
+    start
     ;;
   stop)
-    stopService
+    stop
     ;;
   restart)
-    if [[ $# != 3 ]] ; then  # 判断参数个数
+    if [[ $# != ${PARAMS_COUNT} ]] ; then  # 判断参数个数
         echo "USAGE: $0 ${USAGE}"
         exit 1;
     fi
-    stopService
-    startService
+    stop
+    start
     ;;
   status)
-    checkService
+    status
     ;;
   *)
     echo ${USAGE}
@@ -168,6 +172,8 @@ case "${serviceOperate}" in
 esac
 
 exit 0
+
+
 
 ```
 
